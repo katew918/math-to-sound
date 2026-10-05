@@ -41,13 +41,12 @@ jobs:
       - name: Build
         run: npm run build
 
+      # Requires Pages to be switched on for the repository first, under
+      # Settings -> Pages -> Source: "GitHub Actions". The workflow cannot do
+      # that for itself: creating a Pages site needs admin rights, and the
+      # built-in GITHUB_TOKEN is not an admin.
       - name: Configure Pages
         uses: actions/configure-pages@v5
-        with:
-          # Turns Pages on for this repository on the first run, so there is no
-          # manual step. If this fails, enable it by hand under
-          # Settings -> Pages -> Source: GitHub Actions.
-          enablement: true
 
       - name: Upload the built site
         uses: actions/upload-pages-artifact@v3

@@ -134,6 +134,10 @@ Pushing to `main` builds the site and publishes it to GitHub Pages, via
 [`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). The workflow type-checks and runs the tests
 first, so a broken commit never reaches the live site.
 
+**One-time setup:** GitHub Pages has to be switched on for the repository under
+**Settings → Pages → Source: "GitHub Actions"**. The workflow can't do this itself — creating a Pages site
+needs admin rights, and the built-in `GITHUB_TOKEN` isn't an admin.
+
 Because a GitHub project site is served from `https://<user>.github.io/<repo>/` rather than from a domain
 root, `vite.config.ts` sets `base` to `/math-to-sound/` for builds. **If you ever rename the repository,
 change that `base` to match**, or every asset on the live site will 404.
