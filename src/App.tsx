@@ -7,7 +7,13 @@ import { Settings } from './components/Settings';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
 import { buildFrequencyCurve, buildWavetable, type SoundMode } from './lib/audio';
 import { ParseError, compile, type CompiledFunction } from './lib/parser';
-import { SAMPLE_COUNT, sampleFunction } from './lib/sampling';
+import { SAMPLE_COUNT, robustRange, sampleFunction } from './lib/sampling';
+import {
+  clampAxisValue,
+  ensureSpan,
+  spanIsUsable,
+  type Range,
+} from './lib/viewport';
 
 const INITIAL = PRESETS[0];
 
@@ -24,6 +30,9 @@ export default function App() {
   const [text, setText] = useState(INITIAL.expression);
   const [xMin, setXMin] = useState(INITIAL_X_MIN);
   const [xMax, setXMax] = useState(INITIAL_X_MAX);
+  const [yAuto, setYAuto] = useState(true);
+  const [yMin, setYMin] = useState(-2);
+  const [yMax, setYMax] = useState(2);
   const [mode, setMode] = useState<SoundMode>('sweep');
   const [baseFreq, setBaseFreq] = useState(220);
   const [octaves, setOctaves] = useState(2);
@@ -55,7 +64,8 @@ export default function App() {
   }, [parsed]);
 
   const activeFn = parsed.fn ?? lastGoodFn;
-  const domainValid = xMax > xMin;
+  const domainValid = spanIsUsable(xMin, xMax);
+  const rangeValid = spanIsUsable(yMin, yMax);
 
   // One array, used by both the graph and the audio — so the curve on screen
   // is literally the wave being played.
@@ -68,6 +78,20 @@ export default function App() {
   );
 
   const wavetable = useMemo(() => buildWavetable(ys), [ys]);
+
+  // The auto-fitted y window, also used to seed the manual boxes so switching
+  // to Manual doesn't make the graph jump.
+  const autoRange = useMemo(() => {
+    const fitted = robustRange(ys);
+    return ensureSpan(fitted.lo, fitted.hi);
+  }, [ys]);
+
+  // Fall back to auto while a hand-typed range is unusable, so the graph keeps
+  // drawing instead of going blank while you are halfway through typing.
+  const yRange: Range = useMemo(
+    () => (yAuto || !rangeValid ? autoRange : ensureSpan(yMin, yMax)),
+    [yAuto, rangeValid, autoRange, yMin, yMax],
+  );
   const frequencyCurve = useMemo(
     () => buildFrequencyCurve(ys, baseFreq, octaves),
     [ys, baseFreq, octaves],
@@ -92,6 +116,27 @@ export default function App() {
     setXMax(preset.xMax);
   };
 
+  // Every axis value the UI can produce goes through the clamp, so nothing
+  // outside the drawable window ever reaches the renderer.
+  const handleDomainChange = (min: number, max: number) => {
+    setXMin(clampAxisValue(min, -10));
+    setXMax(clampAxisValue(max, 10));
+  };
+
+  const handleYRangeChange = (min: number, max: number) => {
+    setYMin(clampAxisValue(min, -2));
+    setYMax(clampAxisValue(max, 2));
+  };
+
+  const handleYAutoChange = (auto: boolean) => {
+    // Seed the manual boxes from what is on screen right now.
+    if (!auto) {
+      setYMin(Number(autoRange.lo.toPrecision(4)));
+      setYMax(Number(autoRange.hi.toPrecision(4)));
+    }
+    setYAuto(auto);
+  };
+
   return (
     <div className="app">
       <header className="masthead">
@@ -108,7 +153,7 @@ export default function App() {
         <div className="column">
           <FunctionInput value={text} onChange={setText} error={parsed.error} />
 
-          <Graph ys={ys} xMin={xMin} xMax={xMax} />
+          <Graph ys={ys} xMin={xMin} xMax={xMax} yRange={yRange} />
 
           <Controls
             state={state}
@@ -150,14 +195,19 @@ export default function App() {
             mode={mode}
             xMin={xMin}
             xMax={xMax}
+            yAuto={yAuto}
+            yMin={yMin}
+            yMax={yMax}
             baseFreq={baseFreq}
             octaves={octaves}
             duration={duration}
             volume={volume}
             domainValid={domainValid}
+            rangeValid={rangeValid}
             onModeChange={setMode}
-            onXMinChange={setXMin}
-            onXMaxChange={setXMax}
+            onDomainChange={handleDomainChange}
+            onYAutoChange={handleYAutoChange}
+            onYRangeChange={handleYRangeChange}
             onBaseFreqChange={setBaseFreq}
             onOctavesChange={setOctaves}
             onDurationChange={setDuration}

@@ -124,6 +124,8 @@ Expressions are parsed by a small hand-written recursive-descent parser in
 | --- | --- |
 | **Pitch / Timbre** | Which mapping you listen through. |
 | **Domain** (`x from … to …`) | In pitch mode, the stretch of the function you travel along. In timbre mode it *is* the cycle, so it decides the waveform's shape. |
+| **y axis: Auto / Manual** | Auto fits the function, ignoring asymptote spikes. Manual lets you set the window by hand, seeded from the current fit so the graph doesn't jump. It changes the view only — not how the function sounds. |
+| **Zoom (− / +)** | Scales an axis about its centre, halving or doubling the span. |
 | **Centre pitch** | 55–880 Hz. In pitch mode the middle of the sweep; in timbre mode the note itself. |
 | **Pitch range** | Pitch mode only. How many octaves the function's range is spread across, ±0.5 to ±4. |
 | **Duration** | How long the note is held. |
@@ -152,6 +154,21 @@ src/
     ├── Controls.tsx           play / pause / stop
     └── Settings.tsx           domain, pitch, duration, volume
 ```
+
+## Axis limits
+
+Both axes are capped at **±1e6**, and the two ends of an axis must stay at least **1e-6** apart. Typing
+past a limit clamps to it, and the box shows the clamped value when it loses focus.
+
+The minimum span is not arbitrary. Grid lines are drawn by stepping a loop along the axis, and the "nice"
+step size is a power of ten scaled to the span. For a span around 1e-323 that power of ten underflows to
+**exactly zero**, and a loop advancing by zero never finishes — the tab hangs. A near-constant function
+could reach that through the auto-fitted y axis alone, without anyone typing anything unusual.
+
+The limits make it unreachable from the UI, but `niceStep` in [`src/lib/viewport.ts`](src/lib/viewport.ts)
+also guarantees a finite, strictly positive step on its own, and both grid loops stop after
+`MAX_GRID_LINES` whatever the arithmetic says. Three independent guards, because a frozen tab is not a
+failure anyone can recover from.
 
 ## Deployment
 

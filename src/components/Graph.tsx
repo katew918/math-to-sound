@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { robustRange } from '../lib/sampling';
+import { MAX_GRID_LINES, niceStep, type Range } from '../lib/viewport';
 
 // Canvas can't read CSS custom properties, so these mirror the light palette
 // in src/index.css. Keep the two in step.
@@ -12,16 +12,6 @@ const COLOURS = {
 };
 
 const PADDING = { left: 54, right: 14, top: 14, bottom: 28 };
-
-/** A grid step of 1, 2 or 5 times a power of ten — the steps people expect. */
-function niceStep(range: number, targetCount: number): number {
-  if (!(range > 0)) return 1;
-  const raw = range / targetCount;
-  const magnitude = 10 ** Math.floor(Math.log10(raw));
-  const normalised = raw / magnitude;
-  const step = normalised < 1.5 ? 1 : normalised < 3 ? 2 : normalised < 7 ? 5 : 10;
-  return step * magnitude;
-}
 
 /** Short axis labels without floating-point noise like 0.30000000000000004. */
 function formatTick(value: number): string {
@@ -40,6 +30,7 @@ function draw(
   ys: Float64Array,
   xMin: number,
   xMax: number,
+  yRange: Range,
 ): void {
   c.fillStyle = COLOURS.background;
   c.fillRect(0, 0, width, height);
@@ -48,7 +39,7 @@ function draw(
   const plotHeight = height - PADDING.top - PADDING.bottom;
   if (plotWidth <= 0 || plotHeight <= 0 || !(xMax > xMin)) return;
 
-  const { lo, hi } = robustRange(ys);
+  const { lo, hi } = yRange;
   const toX = (x: number) =>
     PADDING.left + ((x - xMin) / (xMax - xMin)) * plotWidth;
   const toY = (y: number) =>
@@ -62,7 +53,12 @@ function draw(
   // Vertical grid lines and x labels.
   const xStep = niceStep(xMax - xMin, 6);
   c.textAlign = 'center';
-  for (let t = Math.ceil(xMin / xStep) * xStep; t <= xMax + 1e-9; t += xStep) {
+  let drawn = 0;
+  for (
+    let t = Math.ceil(xMin / xStep) * xStep;
+    t <= xMax + 1e-9 && drawn < MAX_GRID_LINES;
+    t += xStep, drawn += 1
+  ) {
     const x = Math.round(toX(t)) + 0.5;
     c.strokeStyle = COLOURS.grid;
     c.beginPath();
@@ -76,7 +72,12 @@ function draw(
   // Horizontal grid lines and y labels.
   const yStep = niceStep(hi - lo, 5);
   c.textAlign = 'right';
-  for (let t = Math.ceil(lo / yStep) * yStep; t <= hi + 1e-9; t += yStep) {
+  drawn = 0;
+  for (
+    let t = Math.ceil(lo / yStep) * yStep;
+    t <= hi + 1e-9 && drawn < MAX_GRID_LINES;
+    t += yStep, drawn += 1
+  ) {
     const y = Math.round(toY(t)) + 0.5;
     c.strokeStyle = COLOURS.grid;
     c.beginPath();
@@ -158,9 +159,11 @@ export interface GraphProps {
   ys: Float64Array;
   xMin: number;
   xMax: number;
+  /** The y window to draw, auto-fitted or set by hand. Always drawable. */
+  yRange: Range;
 }
 
-export function Graph({ ys, xMin, xMax }: GraphProps) {
+export function Graph({ ys, xMin, xMax, yRange }: GraphProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
@@ -192,8 +195,8 @@ export function Graph({ ys, xMin, xMax }: GraphProps) {
     const context = canvas.getContext('2d');
     if (!context) return;
     context.setTransform(ratio, 0, 0, ratio, 0, 0);
-    draw(context, size.width, size.height, ys, xMin, xMax);
-  }, [ys, xMin, xMax, size]);
+    draw(context, size.width, size.height, ys, xMin, xMax, yRange);
+  }, [ys, xMin, xMax, yRange, size]);
 
   return (
     <div className="graph">

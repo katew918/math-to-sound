@@ -437,6 +437,60 @@ kbd {
   gap: 10px;
 }
 
+/* ---------- axis controls ---------- */
+
+.axis {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.axis-zoom {
+  display: flex;
+  gap: 4px;
+}
+
+.axis-zoom button {
+  width: 26px;
+  height: 28px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 15px;
+  line-height: 1;
+  padding: 0;
+}
+
+.axis-zoom button:hover {
+  color: var(--text);
+  border-color: var(--accent-dim);
+}
+
+.axis-mode {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.axis-mode-label {
+  color: var(--text-dim);
+  font-family: var(--mono);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.mode-switch-small {
+  flex: 1;
+}
+
+.mode-switch-small .mode-option {
+  font-size: 12.5px;
+  padding: 5px 8px;
+}
+
 .field-inline {
   flex: 1;
   min-width: 0;
