@@ -1,5 +1,6 @@
 import { Fragment } from 'react';
 import { CONSTANT_NAMES, FUNCTION_NAMES, type ParseError } from '../lib/parser';
+import { MathField } from './MathField';
 
 export interface FunctionInputProps {
   value: string;
@@ -10,41 +11,28 @@ export interface FunctionInputProps {
 export function FunctionInput({ value, onChange, error }: FunctionInputProps) {
   return (
     <section className="panel">
-      <label className="field">
+      <div className="field">
         <span className="field-label">f(x) =</span>
-        <input
-          className={`function-input${error ? ' is-invalid' : ''}`}
-          type="text"
+        <MathField
           value={value}
-          onChange={(event) => onChange(event.target.value)}
-          placeholder="sin(x)"
-          spellCheck={false}
-          autoComplete="off"
-          autoCapitalize="off"
-          aria-invalid={error !== null}
-          aria-describedby="function-input-message"
+          onChange={onChange}
+          errorPosition={error ? error.position : null}
+          label="Function of x"
         />
-      </label>
+      </div>
 
       <div id="function-input-message" role="status" className="message-area">
         {error ? (
           <>
-            {/* A caret under the offending character. The row mirrors the input
-                row exactly — same label, same gap — so the caret lines up
-                without guessing at the label's width. */}
-            <div className="caret-row" aria-hidden="true">
-              <span className="field-label caret-spacer">f(x) =</span>
-              <pre className="error-caret">
-                {`${' '.repeat(Math.max(0, Math.min(error.position, value.length)))}^`}
-              </pre>
-            </div>
+            {/* The offending character is highlighted in the field itself; a
+                caret underneath can't line up with raised exponents. */}
             <p className="error-text">{error.message}</p>
             <p className="hint">Still showing and playing the last valid function.</p>
           </>
         ) : (
           <p className="hint">
-            Operators <code>+ - * / ^</code>, implicit multiplication like{' '}
-            <code>2x</code> or <code>3sin(x)</code>.
+            Press <kbd>^</kbd> for an exponent and <kbd>space</kbd> to drop back
+            down. Implicit multiplication like <code>2x</code> works too.
           </p>
         )}
       </div>

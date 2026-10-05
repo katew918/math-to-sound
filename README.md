@@ -77,10 +77,35 @@ Both modes get a 15 ms fade in and a 30 ms fade out, to keep the start and stop 
 
 There is no Fourier analysis anywhere in this project.
 
+## Typing functions
+
+The input box is a small Desmos-style math field rather than a plain text box.
+
+- **`^` raises into an exponent.** The `^` itself is never shown — the raised position is what says
+  "exponent".
+- **A space drops back down** out of the innermost exponent, so `e^-3x +1` can be typed straight through
+  and comes out as e⁻³ˣ+1. A space on the baseline does nothing, so it never ends up in the expression.
+- **Backspace steps into an exponent** rather than deleting it whole, so a mistyped power can be fixed a
+  character at a time. Backspacing out of an exponent that is already empty removes it.
+- Arrow keys walk in and out of exponents, clicking puts the cursor where you clicked, and pasted text is
+  read the same way typed text is.
+- An exponent you have opened but not filled shows a dashed box, and the expression reports an error until
+  you type into it.
+
+Presets and pasted text are read back into the same form, so `x^2` arrives already rendered as x².
+
+The editing model is a plain tree of characters and superscript groups in [`src/lib/mathNodes.ts`](src/lib/mathNodes.ts),
+kept separate from the React component so the fiddly rules are easy to test. The field writes ordinary text
+out for the parser, so the two never need to know about each other.
+
+**Not supported yet:** selections (shift-click, shift-arrows, select-all), fractions as stacked numerator
+over denominator, and radical signs for `sqrt`. Those are the next steps if you want a fuller Desmos feel.
+
 ## Writing functions
 
 - **Variable:** `x` only.
-- **Operators:** `+ - * / ^` (and `**` as an alias for `^`).
+- **Operators:** `+ - * / ^` (and `**` as an alias for `^`). In the input box, `^` raises into an
+  exponent and space drops back out; see **Typing functions** above.
 - **Implicit multiplication:** `2x`, `3sin(x)`, `2(x+1)`, `(x+1)(x-1)`.
 - **Constants:** `pi`, `e`, `tau`.
 - **Functions:** `sin cos tan asin acos atan sinh cosh tanh exp ln log log10 log2 sqrt cbrt abs sign floor

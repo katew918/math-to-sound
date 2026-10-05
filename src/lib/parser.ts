@@ -245,6 +245,11 @@ export function compile(source: string): CompiledFunction {
     }
 
     if (token.kind === 'op' && token.text === '(') {
+      // The math field writes an exponent as `^()`, so an empty pair of
+      // brackets usually means an exponent was opened but never filled in.
+      if (atOp(')')) {
+        throw new ParseError('Empty brackets — type something inside', token.pos);
+      }
       const inner = parseExpr();
       if (!eatOp(')')) {
         throw new ParseError('Missing closing ")"', peek().pos);
