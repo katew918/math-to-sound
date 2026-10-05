@@ -184,6 +184,33 @@ Because a GitHub project site is served from `https://<user>.github.io/<repo>/` 
 root, `vite.config.ts` sets `base` to `/math-to-sound/` for builds. **If you ever rename the repository,
 change that `base` to match**, or every asset on the live site will 404.
 
+## Visit count
+
+The published page quietly pings a counter so you can see how many people have visited. **Nothing is
+rendered in the app** — visitors see no counter.
+
+**Read the count here:** <https://hits.sh/katew918.github.io/math-to-sound.svg>
+
+Opening that link **adds one** to the total. hits.sh has no read-only endpoint, so every request to it
+counts, which is also why this README links to the badge rather than embedding it as an image: an embedded
+badge would add a hit every time anyone looked at this page.
+
+What the number is, honestly:
+
+- It counts **raw hits**, so crawlers and bots are included.
+- One hit per browser session. A reload in the same tab isn't counted twice, but the same person returning
+  tomorrow is a second visit.
+- `npm run dev` never counts — only the published build does, gated on `import.meta.env.PROD`.
+- It is **unlisted, not private**. Anyone who knows the URL can read it.
+- The first handful of hits are from setting this up and checking it works.
+
+Visitors' browsers make a request to hits.sh, which inevitably sees their IP address and user agent. We
+send nothing ourselves and suppress the referrer. If you'd rather not have that, delete the `recordVisit`
+call in [`src/main.tsx`](src/main.tsx) and the counting stops immediately.
+
+The logic lives in [`src/lib/visits.ts`](src/lib/visits.ts) and never throws — a counter that broke the
+page would be much worse than one that missed a visit.
+
 ## Ideas for later
 
 The sound mappings are isolated in `src/lib/audio.ts`, so adding another is a contained change:
