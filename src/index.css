@@ -1,19 +1,20 @@
 :root {
-  --bg: #0b0e13;
-  --panel: #11161e;
-  --panel-raised: #161d27;
-  --border: #222b38;
-  --border-strong: #2f3a4a;
-  --text: #e4e8ee;
-  --text-dim: #8b95a6;
-  --accent: #5eead4;
-  --accent-dim: #2b6f66;
-  --danger: #f98a8a;
+  --bg: #ffffff;
+  --panel: #ffffff;
+  --panel-raised: #f4f6f8;
+  --border: #e3e6ea;
+  --border-strong: #c7cdd6;
+  --text: #11151b;
+  --text-dim: #5c6675;
+  --accent: #0f766e;
+  --accent-contrast: #ffffff;
+  --accent-dim: #14b8a6;
+  --danger: #c62828;
 
   --radius: 10px;
   --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
 
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 * {
@@ -137,7 +138,7 @@ code {
 .function-input:focus {
   outline: none;
   border-color: var(--accent-dim);
-  box-shadow: 0 0 0 3px rgb(94 234 212 / 0.12);
+  box-shadow: 0 0 0 3px rgb(20 184 166 / 0.18);
 }
 
 .function-input.is-invalid {
@@ -218,7 +219,8 @@ code {
 
 .graph {
   height: 340px;
-  background: #0e1116;
+  /* Keep in step with COLOURS.background in src/components/Graph.tsx. */
+  background: #ffffff;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
@@ -268,7 +270,7 @@ code {
 .control-primary {
   background: var(--accent);
   border-color: var(--accent);
-  color: #06201c;
+  color: var(--accent-contrast);
   font-weight: 600;
 }
 

@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { robustRange } from '../lib/sampling';
 
+// Canvas can't read CSS custom properties, so these mirror the light palette
+// in src/index.css. Keep the two in step.
 const COLOURS = {
-  background: '#0e1116',
-  grid: '#1c2430',
-  axis: '#3c495c',
-  label: '#7c8798',
-  curve: '#5eead4',
+  background: '#ffffff',
+  grid: '#e8ebef',
+  axis: '#9aa3b0',
+  label: '#5c6675',
+  curve: '#000000',
 };
 
 const PADDING = { left: 54, right: 14, top: 14, bottom: 28 };
