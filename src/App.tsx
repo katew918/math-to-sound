@@ -11,10 +11,19 @@ import { SAMPLE_COUNT, sampleFunction } from './lib/sampling';
 
 const INITIAL = PRESETS[0];
 
+/**
+ * The domain the app opens on. Deliberately wider than any single preset's,
+ * to show plenty of the function at a glance. Presets still carry their own
+ * narrower domains, because in timbre mode the domain has to be exactly one
+ * cycle for `sin(x)` to sound like a pure tone.
+ */
+const INITIAL_X_MIN = -10;
+const INITIAL_X_MAX = 10;
+
 export default function App() {
   const [text, setText] = useState(INITIAL.expression);
-  const [xMin, setXMin] = useState(INITIAL.xMin);
-  const [xMax, setXMax] = useState(INITIAL.xMax);
+  const [xMin, setXMin] = useState(INITIAL_X_MIN);
+  const [xMax, setXMax] = useState(INITIAL_X_MAX);
   const [mode, setMode] = useState<SoundMode>('sweep');
   const [baseFreq, setBaseFreq] = useState(220);
   const [octaves, setOctaves] = useState(2);

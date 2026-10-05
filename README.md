@@ -1,5 +1,7 @@
 # Math to Sound
 
+**Live site: <https://katew918.github.io/math-to-sound/>**
+
 Type a mathematical function, see its graph, and hear it — two different ways.
 
 **Pitch** (the default) reads f(x) as a pitch that rises and falls as the curve does, so you hear the
@@ -27,7 +29,7 @@ Then open the URL it prints (usually <http://localhost:5173>).
 | --- | --- |
 | `npm run dev` | Start the dev server with hot reload |
 | `npm run build` | Type-check, then build to `dist/` |
-| `npm run preview` | Serve the built output locally |
+| `npm run preview` | Serve the built output locally, at the same path production uses |
 | `npm test` | Run the parser and wavetable tests |
 | `npm run typecheck` | Type-check without building |
 
@@ -125,6 +127,16 @@ src/
     ├── Controls.tsx           play / pause / stop
     └── Settings.tsx           domain, pitch, duration, volume
 ```
+
+## Deployment
+
+Pushing to `main` builds the site and publishes it to GitHub Pages, via
+[`.github/workflows/deploy.yml`](.github/workflows/deploy.yml). The workflow type-checks and runs the tests
+first, so a broken commit never reaches the live site.
+
+Because a GitHub project site is served from `https://<user>.github.io/<repo>/` rather than from a domain
+root, `vite.config.ts` sets `base` to `/math-to-sound/` for builds. **If you ever rename the repository,
+change that `base` to match**, or every asset on the live site will 404.
 
 ## Ideas for later
 
