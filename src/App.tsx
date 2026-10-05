@@ -5,7 +5,7 @@ import { Graph } from './components/Graph';
 import { PRESETS, Presets, type Preset } from './components/Presets';
 import { Settings } from './components/Settings';
 import { useAudioPlayer } from './hooks/useAudioPlayer';
-import { buildWavetable } from './lib/audio';
+import { buildFrequencyCurve, buildWavetable, type SoundMode } from './lib/audio';
 import { ParseError, compile, type CompiledFunction } from './lib/parser';
 import { SAMPLE_COUNT, sampleFunction } from './lib/sampling';
 
@@ -15,7 +15,9 @@ export default function App() {
   const [text, setText] = useState(INITIAL.expression);
   const [xMin, setXMin] = useState(INITIAL.xMin);
   const [xMax, setXMax] = useState(INITIAL.xMax);
+  const [mode, setMode] = useState<SoundMode>('sweep');
   const [baseFreq, setBaseFreq] = useState(220);
+  const [octaves, setOctaves] = useState(2);
   const [duration, setDuration] = useState(2);
   const [volume, setVolume] = useState(0.5);
 
@@ -57,6 +59,10 @@ export default function App() {
   );
 
   const wavetable = useMemo(() => buildWavetable(ys), [ys]);
+  const frequencyCurve = useMemo(
+    () => buildFrequencyCurve(ys, baseFreq, octaves),
+    [ys, baseFreq, octaves],
+  );
 
   const { state, play, pause, resume, stop, setVolume: applyVolume, setBaseFreq: applyBaseFreq } =
     useAudioPlayer();
@@ -65,10 +71,11 @@ export default function App() {
   useEffect(() => applyVolume(volume), [volume, applyVolume]);
   useEffect(() => applyBaseFreq(baseFreq), [baseFreq, applyBaseFreq]);
 
-  // A new function or domain is a different wave, so stop rather than splice.
+  // A new function, domain or mapping is a different sound, so stop rather
+  // than try to splice it into the note already playing.
   useEffect(() => {
     void stop();
-  }, [activeFn, xMin, xMax, stop]);
+  }, [activeFn, xMin, xMax, mode, stop]);
 
   const handlePick = (preset: Preset) => {
     setText(preset.expression);
@@ -81,8 +88,10 @@ export default function App() {
       <header className="masthead">
         <h1>Math to Sound</h1>
         <p>
-          Type a function of <code>x</code>. Its curve becomes one cycle of a
-          waveform, looped at the pitch you choose — so you hear the shape you see.
+          Type a function of <code>x</code>, see its graph, and hear it. Either
+          follow the curve as a <strong>pitch</strong> that rises and falls with
+          f(x), or play the curve itself as a waveform and hear its{' '}
+          <strong>timbre</strong>.
         </p>
       </header>
 
@@ -95,19 +104,30 @@ export default function App() {
           <Controls
             state={state}
             canPlay={domainValid}
-            onPlay={() => void play({ wavetable, baseFreq, duration, volume })}
+            onPlay={() =>
+              void play({ mode, wavetable, frequencyCurve, baseFreq, duration, volume })
+            }
             onPause={() => void pause()}
             onResume={() => void resume()}
             onStop={() => void stop()}
           />
 
-          {wavetable.silent && domainValid && (
+          {domainValid && mode === 'sweep' && (
+            <p className="notice">
+              {frequencyCurve.flat
+                ? 'This function is constant across the domain, so the pitch holds steady.'
+                : `Sweeping ${Math.round(frequencyCurve.lowestHz)} Hz to ${Math.round(
+                    frequencyCurve.highestHz,
+                  )} Hz as f(x) rises and falls.`}
+            </p>
+          )}
+          {domainValid && mode === 'waveform' && wavetable.silent && (
             <p className="notice">
               This function is constant across the domain, so there is no wave to
               hear. Try widening the domain.
             </p>
           )}
-          {wavetable.clipped && (
+          {mode === 'waveform' && wavetable.clipped && (
             <p className="notice">
               A spike near an asymptote was clamped so the rest of the wave stays
               audible.
@@ -118,15 +138,19 @@ export default function App() {
         <aside className="column column-side">
           <Presets current={text} onPick={handlePick} />
           <Settings
+            mode={mode}
             xMin={xMin}
             xMax={xMax}
             baseFreq={baseFreq}
+            octaves={octaves}
             duration={duration}
             volume={volume}
             domainValid={domainValid}
+            onModeChange={setMode}
             onXMinChange={setXMin}
             onXMaxChange={setXMax}
             onBaseFreqChange={setBaseFreq}
+            onOctavesChange={setOctaves}
             onDurationChange={setDuration}
             onVolumeChange={setVolume}
           />
@@ -134,8 +158,10 @@ export default function App() {
       </main>
 
       <footer className="footnote">
-        The wave is centred on zero and normalised before playing, so volume is
-        yours to set and not a side effect of the function's scale.
+        Both mappings normalise the function's own scale away — one to a peak of
+        1, the other onto a span of octaves — so how loud and how high it sounds
+        stay yours to set, rather than being an accident of the numbers f(x)
+        happens to produce.
       </footer>
     </div>
   );

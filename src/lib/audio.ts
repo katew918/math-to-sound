@@ -1,4 +1,7 @@
-import { robustPeak } from './sampling';
+import { robustPeak, robustRange } from './sampling';
+
+/** The two ways this app can turn a function into sound. */
+export type SoundMode = 'sweep' | 'waveform';
 
 /**
  * Turning a function into sound
@@ -99,6 +102,81 @@ export function buildWavetable(ys: Float64Array): Wavetable {
   }
 
   return { samples, silent: limit === 0, clipped };
+}
+
+/**
+ * Pitch sweep: f(x) drives the frequency of a tone over time
+ * ----------------------------------------------------------
+ * Here the function is heard as a melody rather than a timbre. The value of
+ * f(x) is read as a pitch, so you follow the curve with your ears:
+ *
+ *   x       -> a steadily rising glissando
+ *   x^2     -> falls to the vertex, then rises
+ *   sin(x)  -> a wobbling siren
+ *   1/x     -> plunges, then levels out
+ *
+ * Mapping is exponential, because pitch is perceived logarithmically: a
+ * straight line sounds like an even rise only if each equal step in f(x) is an
+ * equal *ratio* in frequency. A linear map makes the low end sound bunched up.
+ */
+
+/** Keep sweeps inside a range that is audible and safely below Nyquist. */
+const MIN_SWEEP_HZ = 20;
+const MAX_SWEEP_HZ = 8000;
+
+export interface FrequencyCurve {
+  /** One frequency in hertz per sample, for `setValueCurveAtTime`. */
+  values: Float32Array<ArrayBuffer>;
+  lowestHz: number;
+  highestHz: number;
+  /** True when the function is constant, so the pitch never moves. */
+  flat: boolean;
+}
+
+/**
+ * Map sampled function values onto a curve of frequencies.
+ *
+ * The function's robust range (the same one the graph's y-axis uses, so an
+ * asymptote spike cannot dominate) is stretched across `octaves` either side of
+ * `centreHz`. The midpoint of the function's range sounds at `centreHz`.
+ */
+export function buildFrequencyCurve(
+  ys: Float64Array,
+  centreHz: number,
+  octaves: number,
+): FrequencyCurve {
+  const n = ys.length;
+  const values = new Float32Array(n);
+  const { lo, hi } = robustRange(ys);
+  const span = hi - lo;
+
+  let lowestHz = Infinity;
+  let highestHz = 0;
+  // Carried forward across non-finite samples so an asymptote doesn't click.
+  let lastHz = centreHz;
+
+  for (let i = 0; i < n; i += 1) {
+    const value = ys[i];
+
+    if (Number.isFinite(value) && span > 0) {
+      // -1 at the bottom of the range, +1 at the top.
+      const centred = ((value - lo) / span) * 2 - 1;
+      const clamped = centred < -1 ? -1 : centred > 1 ? 1 : centred;
+      const hz = centreHz * 2 ** (clamped * octaves);
+      lastHz = hz < MIN_SWEEP_HZ ? MIN_SWEEP_HZ : hz > MAX_SWEEP_HZ ? MAX_SWEEP_HZ : hz;
+    }
+
+    values[i] = lastHz;
+    if (lastHz < lowestHz) lowestHz = lastHz;
+    if (lastHz > highestHz) highestHz = lastHz;
+  }
+
+  return {
+    values,
+    lowestHz,
+    highestHz,
+    flat: highestHz - lowestHz < 1,
+  };
 }
 
 /**

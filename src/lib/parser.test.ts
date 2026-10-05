@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ParseError, compile } from './parser';
-import { buildWavetable } from './audio';
+import { buildFrequencyCurve, buildWavetable } from './audio';
 import { robustPeak, sampleFunction } from './sampling';
 
 /** Evaluate an expression at a single x. */
@@ -207,5 +207,64 @@ describe('buildWavetable', () => {
     expect(table.clipped).toBe(true);
     expect(table.samples.every((v) => Number.isFinite(v))).toBe(true);
     expect(peak(table.samples)).toBeCloseTo(1, 5);
+  });
+});
+
+describe('buildFrequencyCurve', () => {
+  const curveFor = (source: string, xMin: number, xMax: number, octaves = 2) =>
+    buildFrequencyCurve(sampleFunction(compile(source), xMin, xMax), 220, octaves);
+
+  it('rises monotonically for f(x) = x', () => {
+    const { values } = curveFor('x', -1, 1);
+    let increasing = true;
+    for (let i = 1; i < values.length; i += 1) {
+      if (values[i] < values[i - 1]) increasing = false;
+    }
+    expect(increasing).toBe(true);
+    expect(values[0]).toBeLessThan(220);
+    expect(values[values.length - 1]).toBeGreaterThan(220);
+  });
+
+  it('falls then rises for a parabola, with the vertex at the bottom', () => {
+    const { values } = curveFor('x^2', -1, 1);
+    const middle = Math.floor(values.length / 2);
+    expect(values[middle]).toBeLessThan(values[0]);
+    expect(values[middle]).toBeLessThan(values[values.length - 1]);
+  });
+
+  it('spans the requested number of octaves', () => {
+    const { lowestHz, highestHz } = curveFor('x', -1, 1, 2);
+    // Ends of the robust range map to centre * 2^±octaves, so the ratio between
+    // them is 2^(2*octaves). robustRange pads by 10%, so allow some slack.
+    expect(highestHz / lowestHz).toBeGreaterThan(2 ** (2 * 2) * 0.5);
+    expect(highestHz / lowestHz).toBeLessThanOrEqual(2 ** (2 * 2) + 1e-6);
+  });
+
+  it('widens with more octaves', () => {
+    const narrow = curveFor('x', -1, 1, 1);
+    const wide = curveFor('x', -1, 1, 3);
+    expect(wide.highestHz / wide.lowestHz).toBeGreaterThan(
+      narrow.highestHz / narrow.lowestHz,
+    );
+  });
+
+  it('holds a steady pitch for a constant function', () => {
+    const { values, flat } = curveFor('7', -1, 1);
+    expect(flat).toBe(true);
+    expect(values.every((v) => Math.abs(v - 220) < 1)).toBe(true);
+  });
+
+  it('stays finite and in range across an asymptote', () => {
+    const { values, lowestHz, highestHz } = curveFor('1/x', -1, 1);
+    expect(values.every((v) => Number.isFinite(v) && v >= 20 && v <= 8000)).toBe(true);
+    expect(lowestHz).toBeGreaterThan(0);
+    expect(highestHz).toBeLessThanOrEqual(8000);
+  });
+
+  it('produces a curve the Web Audio API can accept', () => {
+    const { values } = curveFor('sin(x)', 0, Math.PI * 2);
+    // setValueCurveAtTime needs a Float32Array of finite, positive values.
+    expect(values).toBeInstanceOf(Float32Array);
+    expect(values.every((v) => Number.isFinite(v) && v > 0)).toBe(true);
   });
 });

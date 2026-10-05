@@ -92,6 +92,46 @@ code {
   padding: 16px;
 }
 
+.panel-title-spaced {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+}
+
+/* ---------- sound-mapping switch ---------- */
+
+.mode-switch {
+  display: flex;
+  gap: 4px;
+  background: var(--panel-raised);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px;
+}
+
+.mode-option {
+  flex: 1;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 7px 10px;
+}
+
+.mode-option:hover {
+  color: var(--text);
+}
+
+.mode-option.is-active {
+  background: var(--panel);
+  border-color: var(--border-strong);
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .panel-title {
   margin: 0 0 12px;
   font-size: 12px;

@@ -1,15 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
+import type { SoundMode } from '../lib/audio';
 
 export interface SettingsProps {
+  mode: SoundMode;
   xMin: number;
   xMax: number;
   baseFreq: number;
+  octaves: number;
   duration: number;
   volume: number;
   domainValid: boolean;
+  onModeChange: (mode: SoundMode) => void;
   onXMinChange: (value: number) => void;
   onXMaxChange: (value: number) => void;
   onBaseFreqChange: (value: number) => void;
+  onOctavesChange: (value: number) => void;
   onDurationChange: (value: number) => void;
   onVolumeChange: (value: number) => void;
 }
@@ -98,22 +103,59 @@ function Slider({ label, value, display, min, max, step, onChange }: SliderProps
   );
 }
 
+const MODES: { value: SoundMode; label: string; blurb: string }[] = [
+  {
+    value: 'sweep',
+    label: 'Pitch',
+    blurb: 'f(x) sets the pitch as it moves, so you hear the curve as a melody.',
+  },
+  {
+    value: 'waveform',
+    label: 'Timbre',
+    blurb:
+      'The curve becomes one cycle of a looping wave. Every function plays at the same pitch; only the tone colour changes.',
+  },
+];
+
 export function Settings({
+  mode,
   xMin,
   xMax,
   baseFreq,
+  octaves,
   duration,
   volume,
   domainValid,
+  onModeChange,
   onXMinChange,
   onXMaxChange,
   onBaseFreqChange,
+  onOctavesChange,
   onDurationChange,
   onVolumeChange,
 }: SettingsProps) {
+  const sweeping = mode === 'sweep';
+
   return (
     <section className="panel">
-      <h2 className="panel-title">Settings</h2>
+      <h2 className="panel-title">What you hear</h2>
+
+      <div className="mode-switch" role="group" aria-label="Sound mapping">
+        {MODES.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            className={`mode-option${option.value === mode ? ' is-active' : ''}`}
+            onClick={() => onModeChange(option.value)}
+            aria-pressed={option.value === mode}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+      <p className="hint">{MODES.find((m) => m.value === mode)?.blurb}</p>
+
+      <h2 className="panel-title panel-title-spaced">Settings</h2>
 
       <div className="domain">
         <NumberField
@@ -132,7 +174,9 @@ export function Settings({
 
       {domainValid ? (
         <p className="hint">
-          This span becomes one cycle of the wave, so it decides the shape you hear.
+          {sweeping
+            ? 'The stretch of the function you listen to.'
+            : 'This span becomes one cycle of the wave, so it decides the shape you hear.'}
         </p>
       ) : (
         <p className="error-text">
@@ -141,7 +185,7 @@ export function Settings({
       )}
 
       <Slider
-        label="Pitch"
+        label={sweeping ? 'Centre pitch' : 'Pitch'}
         value={baseFreq}
         display={`${Math.round(baseFreq)} Hz`}
         min={55}
@@ -149,6 +193,17 @@ export function Settings({
         step={1}
         onChange={onBaseFreqChange}
       />
+      {sweeping && (
+        <Slider
+          label="Pitch range"
+          value={octaves}
+          display={`±${octaves.toFixed(1)} oct`}
+          min={0.5}
+          max={4}
+          step={0.1}
+          onChange={onOctavesChange}
+        />
+      )}
       <Slider
         label="Duration"
         value={duration}

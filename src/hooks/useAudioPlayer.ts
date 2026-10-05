@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { playbackRateFor, type Wavetable } from '../lib/audio';
+import {
+  playbackRateFor,
+  type FrequencyCurve,
+  type SoundMode,
+  type Wavetable,
+} from '../lib/audio';
 
 export type PlaybackState = 'idle' | 'playing' | 'paused';
 
@@ -11,8 +16,13 @@ const RELEASE_SECONDS = 0.03;
 const LEAD_SECONDS = 0.02;
 
 export interface PlayOptions {
+  /** Which mapping to play: a looping waveform, or a pitch sweep. */
+  mode: SoundMode;
+  /** Used by 'waveform' mode. */
   wavetable: Wavetable;
-  /** Pitch in hertz that the single cycle repeats at. */
+  /** Used by 'sweep' mode. */
+  frequencyCurve: FrequencyCurve;
+  /** Waveform mode: the pitch the cycle repeats at. Sweep mode: the centre pitch. */
   baseFreq: number;
   /** How long to hold the note, in seconds. */
   duration: number;
@@ -31,7 +41,8 @@ export function useAudioPlayer() {
   const contextRef = useRef<AudioContext | null>(null);
   const masterRef = useRef<GainNode | null>(null);
   const envelopeRef = useRef<GainNode | null>(null);
-  const sourceRef = useRef<AudioBufferSourceNode | null>(null);
+  // Either an AudioBufferSourceNode (waveform) or an OscillatorNode (sweep).
+  const sourceRef = useRef<AudioScheduledSourceNode | null>(null);
   const cycleLengthRef = useRef(0);
 
   const [state, setState] = useState<PlaybackState>('idle');
@@ -84,36 +95,58 @@ export function useAudioPlayer() {
   }, []);
 
   const play = useCallback(
-    async ({ wavetable, baseFreq, duration, volume }: PlayOptions) => {
+    async ({
+      mode,
+      wavetable,
+      frequencyCurve,
+      baseFreq,
+      duration,
+      volume,
+    }: PlayOptions) => {
       const { context, master } = ensureContext();
       if (context.state === 'suspended') await context.resume();
 
       teardownSource();
 
-      const cycleLength = wavetable.samples.length;
-      const buffer = context.createBuffer(1, cycleLength, context.sampleRate);
-      buffer.copyToChannel(wavetable.samples, 0);
-
       const envelope = context.createGain();
-      const source = context.createBufferSource();
-      source.buffer = buffer;
-      source.loop = true;
-      source.loopStart = 0;
-      source.loopEnd = buffer.duration;
-      source.playbackRate.value = playbackRateFor(
-        baseFreq,
-        cycleLength,
-        context.sampleRate,
-      );
-
-      source.connect(envelope);
-      envelope.connect(master);
-      master.gain.setTargetAtTime(volume, context.currentTime, 0.01);
 
       // Never let the note be shorter than its own fade in and out.
       const held = Math.max(duration, ATTACK_SECONDS + RELEASE_SECONDS);
       const start = context.currentTime + LEAD_SECONDS;
       const end = start + held;
+
+      const cycleLength = wavetable.samples.length;
+      let source: AudioScheduledSourceNode;
+
+      if (mode === 'waveform') {
+        // One cycle of the curve, looped at the chosen pitch.
+        const buffer = context.createBuffer(1, cycleLength, context.sampleRate);
+        buffer.copyToChannel(wavetable.samples, 0);
+
+        const bufferSource = context.createBufferSource();
+        bufferSource.buffer = buffer;
+        bufferSource.loop = true;
+        bufferSource.loopStart = 0;
+        bufferSource.loopEnd = buffer.duration;
+        bufferSource.playbackRate.value = playbackRateFor(
+          baseFreq,
+          cycleLength,
+          context.sampleRate,
+        );
+        source = bufferSource;
+      } else {
+        // A plain tone whose frequency traces the curve over the note.
+        const oscillator = context.createOscillator();
+        oscillator.type = 'sine';
+        // No setValueAtTime beforehand: an event overlapping the curve's own
+        // window makes setValueCurveAtTime throw.
+        oscillator.frequency.setValueCurveAtTime(frequencyCurve.values, start, held);
+        source = oscillator;
+      }
+
+      source.connect(envelope);
+      envelope.connect(master);
+      master.gain.setTargetAtTime(volume, context.currentTime, 0.01);
 
       envelope.gain.setValueAtTime(0, start);
       envelope.gain.linearRampToValueAtTime(1, start + ATTACK_SECONDS);
@@ -194,11 +227,21 @@ export function useAudioPlayer() {
     }
   }, []);
 
-  /** Re-pitch a note that is already sounding, without restarting it. */
+  /**
+   * Re-pitch a note that is already sounding, without restarting it.
+   *
+   * Only meaningful in waveform mode. A sweep's frequency is an already
+   * scheduled curve, so re-centring it mid-note would mean tearing that curve
+   * up and rebuilding it; there the new pitch applies on the next play.
+   */
   const setBaseFreq = useCallback((baseFreq: number) => {
     const context = contextRef.current;
     const source = sourceRef.current;
-    if (context && source && cycleLengthRef.current > 0) {
+    if (
+      context &&
+      source instanceof AudioBufferSourceNode &&
+      cycleLengthRef.current > 0
+    ) {
       source.playbackRate.setTargetAtTime(
         playbackRateFor(baseFreq, cycleLengthRef.current, context.sampleRate),
         context.currentTime,
