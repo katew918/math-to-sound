@@ -64,6 +64,25 @@ export function FunctionInput({ value, onChange, error }: FunctionInputProps) {
           <code>log</code> is the natural logarithm (same as <code>ln</code>); use{' '}
           <code>log10</code> for base ten.
         </p>
+        <p>
+          <strong>Remainder:</strong> <code>x mod 2</code>, which can also be written{' '}
+          <code>mod(x, 2)</code>.
+        </p>
+        <p>
+          <strong>Comparisons:</strong> <code>&lt;</code> <code>&gt;</code>{' '}
+          <code>&lt;=</code> <code>&gt;=</code> <code>=</code>, and they chain, so{' '}
+          <code>0 &lt; x &lt; 1</code> means both halves hold.
+        </p>
+        <p>
+          <strong>Piecewise:</strong> <code>{'{x < 0: -1, x < 1: x, 2}'}</code> — pairs of{' '}
+          <code>condition: value</code>, with an optional plain value at the end as the
+          fallback. The first condition that holds wins, and with nothing matching the
+          function is simply undefined there.
+        </p>
+        <p className="hint">
+          Typeset symbols pasted from elsewhere work too: <code>⌊x⌋</code>{' '}
+          <code>⌈x⌉</code> <code>≤</code> <code>≥</code> <code>·</code> <code>×</code>.
+        </p>
       </details>
     </section>
   );

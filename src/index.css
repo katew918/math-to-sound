@@ -12,7 +12,10 @@
   --danger: #c62828;
 
   --radius: 10px;
-  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono', monospace;
+  /* The last two only ever supply glyphs the monospace fonts lack, such as
+     the floor and ceiling brackets. */
+  --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, 'Liberation Mono',
+    monospace, 'Cambria Math', 'STIX Two Math';
 
   color-scheme: light;
 }

@@ -84,7 +84,8 @@ The input box is a small Desmos-style math field rather than a plain text box.
 - **`^` raises into an exponent.** The `^` itself is never shown — the raised position is what says
   "exponent".
 - **A space drops back down** out of the innermost exponent, so `e^-3x +1` can be typed straight through
-  and comes out as e⁻³ˣ+1. A space on the baseline does nothing, so it never ends up in the expression.
+  and comes out as e⁻³ˣ+1. On the baseline there is no exponent to leave, so a space is just a space —
+  which `x mod 2` needs, or it would collapse into the single unknown name `xmod2`.
 - **Backspace steps into an exponent** rather than deleting it whole, so a mistyped power can be fixed a
   character at a time. Backspacing out of an exponent that is already empty removes it.
 - Arrow keys walk in and out of exponents, clicking puts the cursor where you clicked, and pasted text is
@@ -106,6 +107,17 @@ over denominator, and radical signs for `sqrt`. Those are the next steps if you 
 - **Variable:** `x` only.
 - **Operators:** `+ - * / ^` (and `**` as an alias for `^`). In the input box, `^` raises into an
   exponent and space drops back out; see **Typing functions** above.
+- **Remainder:** `x mod 2`, or `mod(x, 2)`. It binds tighter than a comparison and looser than `+`, so
+  `6x mod 1` and `x mod 2 < 0.5` both read the way they look, and it follows the sign of the divisor.
+- **Comparisons:** `< > <= >= =`, giving 1 or 0. They chain like maths does, so `0 < x < 1` means both
+  halves hold rather than comparing a flag against 1.
+- **Piecewise:** `{x < 0: -1, x < 1: x, 2}` — comma-separated `condition: value` branches with an
+  optional plain value at the end as the fallback. The first condition that holds wins. With nothing
+  matching and no fallback the function is simply undefined there, so the graph breaks and the audio
+  falls silent rather than pretending the answer is zero.
+- **Typeset symbols** pasted from elsewhere are understood: `⌊x⌋` `⌈x⌉` `≤` `≥` `·` `×`, and the real
+  minus sign `−` as distinct from a hyphen. So a function copied out of a textbook or a LaTeX render
+  mostly just works.
 - **Implicit multiplication:** `2x`, `3sin(x)`, `2(x+1)`, `(x+1)(x-1)`.
 - **Constants:** `pi`, `e`, `tau`.
 - **Functions:** `sin cos tan asin acos atan sinh cosh tanh exp ln log log10 log2 sqrt cbrt abs sign floor
@@ -218,4 +230,7 @@ The sound mappings are isolated in `src/lib/audio.ts`, so adding another is a co
 - **Direct samples** — read `f(x)` straight into audio samples across the duration, so the domain's width
   sets the pitch.
 - A playhead on the graph tracking the note as it sweeps, so you can see where in the curve you are.
+- Rendering a piecewise definition with a real tall brace and stacked rows, the way it appears in a
+  textbook. The field understands the syntax but still shows it on one line.
+- `and` / `or` in conditions, for cases that chained comparisons can't express.
 - Export the result as a `.wav`, plot several functions at once, or add a harmonic breakdown.

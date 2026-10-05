@@ -4,6 +4,8 @@ export interface Preset {
   xMax: number;
   /** What this one sounds like, shown as the button's tooltip. */
   sounds: string;
+  /** Shown on the button when the expression is too long to read at a glance. */
+  label?: string;
 }
 
 const TAU = Math.PI * 2;
@@ -28,6 +30,22 @@ export const PRESETS: readonly Preset[] = [
   { expression: 'sin(1/x)', xMin: 0.05, xMax: 1, sounds: 'Harsh and chaotic' },
   { expression: '1/x', xMin: 0.1, xMax: 2, sounds: 'Thin and reedy' },
   { expression: 'exp(-x^2)', xMin: -3, xMax: 3, sounds: 'A soft pulse' },
+  {
+    expression: '{x mod 2 < 1: 1, -1}',
+    xMin: 0,
+    xMax: 4,
+    sounds: 'A square wave, written as two cases instead of as a formula',
+  },
+  {
+    label: 'piecewise mix',
+    expression:
+      '{x mod 2 < 0.5: 3(1 - 2floor(2(6x mod 1))), ' +
+      'x mod 2 < 1.2: -1.2, ' +
+      '2.2*2(2x - floor(2x + 1/2))}',
+    xMin: 0,
+    xMax: 4,
+    sounds: 'Three different shapes spliced together, repeating every 2',
+  },
 ];
 
 export interface PresetsProps {
@@ -46,9 +64,11 @@ export function Presets({ current, onPick }: PresetsProps) {
             type="button"
             className={`preset${preset.expression === current ? ' is-active' : ''}`}
             onClick={() => onPick(preset)}
-            title={preset.sounds}
+            title={
+              preset.label ? `${preset.expression}\n\n${preset.sounds}` : preset.sounds
+            }
           >
-            {preset.expression}
+            {preset.label ?? preset.expression}
           </button>
         ))}
       </div>

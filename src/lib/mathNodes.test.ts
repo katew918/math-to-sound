@@ -47,9 +47,10 @@ describe('typing', () => {
     expect(serialize(type('2^10').nodes)).toBe('2^(10)');
   });
 
-  it('never leaves a literal ^ or a space in the text', () => {
+  it('never leaves a literal ^ in the text', () => {
     const text = serialize(type('e^-3x 1').nodes);
     expect(text).not.toContain('^-');
+    // The space was spent leaving the exponent, so none survives here.
     expect(text).not.toContain(' ');
   });
 
@@ -62,8 +63,15 @@ describe('typing', () => {
     expect(serialize(state.nodes)).toBe('2^(2^(2)9)7');
   });
 
-  it('ignores a space typed at the baseline', () => {
-    expect(serialize(type('x + 1').nodes)).toBe('x+1');
+  it('keeps a space typed at the baseline', () => {
+    // Needed for `x mod 2`: swallowing these would leave the single name
+    // `xmod2`, which is not a thing.
+    expect(serialize(type('x + 1').nodes)).toBe('x + 1');
+    expect(serialize(type('x mod 2').nodes)).toBe('x mod 2');
+  });
+
+  it('still uses a space to leave an exponent', () => {
+    expect(serialize(type('2^8 +1').nodes)).toBe('2^(8)+1');
   });
 
   it('puts the cursor inside the new exponent', () => {

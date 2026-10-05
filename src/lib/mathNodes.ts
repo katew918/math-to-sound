@@ -76,8 +76,12 @@ function exitGroup(cursor: Cursor): Cursor {
  *
  * `^` opens a superscript and puts the cursor inside it. A space closes the
  * innermost superscript and returns to the baseline — the Desmos behaviour that
- * lets you write `e^(-3x) + 1` without ever reaching for an arrow key. A space
- * at the baseline is ignored, so it never ends up inside the expression text.
+ * lets you write `e^(-3x) + 1` without ever reaching for an arrow key.
+ *
+ * At the baseline there is no superscript to close, so a space is simply a
+ * space. That matters: `x mod 2` needs its spaces to read as three tokens, and
+ * swallowing them would turn it into the single unknown name `xmod2`. The
+ * parser skips whitespace, so keeping them costs nothing.
  */
 export function insertChar(
   nodes: MathNode[],
@@ -94,7 +98,9 @@ export function insertChar(
     };
   }
 
-  if (ch === ' ') {
+  // Inside a superscript a space means "come back down"; at the baseline there
+  // is nothing to come down from, so it is just a space.
+  if (ch === ' ' && cursor.path.length > 0) {
     return { nodes, cursor: exitGroup(cursor) };
   }
 

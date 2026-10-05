@@ -92,8 +92,37 @@ interface Token {
 const NUMBER_RE = /(?:\d+\.?\d*|\.\d+)(?:[eE][+-]?\d+)?/y;
 const NAME_RE = /[A-Za-z_][A-Za-z0-9_]*/y;
 
-// Longest operators first, so `**` is preferred over `*`.
-const OPERATORS = ['**', '+', '-', '*', '/', '^', '(', ')', ','];
+// Longest operators first, so `**` beats `*` and `<=` beats `<`.
+const OPERATORS = [
+  '**', '<=', '>=',
+  '+', '-', '*', '/', '^', '(', ')', ',',
+  '{', '}', ':', '<', '>', '=',
+];
+
+/**
+ * Symbols that get pasted in from typeset maths, each mapped to what we parse.
+ * Means an expression copied out of a textbook or a LaTeX render mostly works.
+ */
+const ALIASES: Record<string, string> = {
+  '\u00b7': '*',   // middle dot
+  '\u00d7': '*',   // multiplication sign
+  '\u2212': '-',   // minus sign (not a hyphen)
+  '\u2264': '<=',  // less than or equal
+  '\u2265': '>=',  // greater than or equal
+  '\u230a': '|_',  // left floor
+  '\u230b': '_|',  // right floor
+  '\u2308': '|^',  // left ceiling
+  '\u2309': '^|',  // right ceiling
+};
+
+/** Comparisons, lowest-binding of the operators. */
+const COMPARISONS: Record<string, (a: number, b: number) => boolean> = {
+  '<': (a, b) => a < b,
+  '>': (a, b) => a > b,
+  '<=': (a, b) => a <= b,
+  '>=': (a, b) => a >= b,
+  '=': (a, b) => a === b,
+};
 
 function tokenize(source: string): Token[] {
   const tokens: Token[] = [];
@@ -120,6 +149,13 @@ function tokenize(source: string): Token[] {
     if (name) {
       tokens.push({ kind: 'name', text: name[0], value: 0, pos: i });
       i += name[0].length;
+      continue;
+    }
+
+    const alias = ALIASES[ch];
+    if (alias) {
+      tokens.push({ kind: 'op', text: alias, value: 0, pos: i });
+      i += 1;
       continue;
     }
 
@@ -164,17 +200,85 @@ export function compile(source: string): CompiledFunction {
     return true;
   };
 
-  /** True when the next token could begin a new atom, implying multiplication. */
+  const atName = (text: string): boolean => {
+    const token = tokens[pos];
+    return token.kind === 'name' && token.text.toLowerCase() === text;
+  };
+
+  /**
+   * True when the next token could begin a new atom, implying multiplication.
+   *
+   * `mod` is deliberately excluded. It reads as an infix operator here, so
+   * `x mod 2` must not be mistaken for `x` times something called `mod`.
+   * Written as a call, `mod(a, b)`, it is reached through parseAtom instead.
+   */
   const startsAtom = (): boolean => {
     const token = tokens[pos];
+    if (atName('mod')) return false;
     return (
       token.kind === 'num' ||
       token.kind === 'name' ||
-      (token.kind === 'op' && token.text === '(')
+      (token.kind === 'op' &&
+        (token.text === '(' || token.text === '{' ||
+         token.text === '|_' || token.text === '|^'))
     );
   };
 
-  function parseExpr(): CompiledFunction {
+  /**
+   * The top of the grammar: comparisons, which bind loosest of all.
+   *
+   * Chains the way maths does, so `0 < x < 1` means both halves hold rather
+   * than comparing a boolean against 1. The result is 1 or 0, which is what
+   * makes a comparison usable as a piecewise condition.
+   */
+  function parseExpression(): CompiledFunction {
+    let left = parseMod();
+    const parts: { op: (a: number, b: number) => boolean; right: CompiledFunction }[] = [];
+
+    for (;;) {
+      const token = tokens[pos];
+      if (token.kind !== 'op') break;
+      const compare = COMPARISONS[token.text];
+      if (!compare) break;
+      pos += 1;
+      parts.push({ op: compare, right: parseMod() });
+    }
+
+    if (parts.length === 0) return left;
+
+    const first = left;
+    return (x) => {
+      let previous = first(x);
+      for (const part of parts) {
+        const next = part.right(x);
+        if (!part.op(previous, next)) return 0;
+        previous = next;
+      }
+      return 1;
+    };
+  }
+
+  /**
+   * `a mod b`, binding tighter than a comparison and looser than `+`, so
+   * `x mod 2 < 0.5` and `6x mod 1` both read the way they look.
+   */
+  function parseMod(): CompiledFunction {
+    let left = parseAdditive();
+    while (atName('mod')) {
+      pos += 1;
+      const l = left;
+      const r = parseAdditive();
+      // True modulo, so the result follows the sign of the divisor.
+      left = (x) => {
+        const a = l(x);
+        const b = r(x);
+        return a - b * Math.floor(a / b);
+      };
+    }
+    return left;
+  }
+
+  function parseAdditive(): CompiledFunction {
     let left = parseTerm();
     for (;;) {
       if (eatOp('+')) {
@@ -235,6 +339,61 @@ export function compile(source: string): CompiledFunction {
     return base;
   }
 
+  /**
+   * A piecewise definition, written the way Desmos writes it:
+   *
+   *     {x < 0: -1, x < 1: x, 2}
+   *
+   * Comma-separated `condition: value` branches, with an optional bare value
+   * at the end as the fallback. Branches are tried in order and the first
+   * whose condition holds wins, so later conditions only need to say what the
+   * earlier ones didn't already cover.
+   *
+   * With no branch matching and no fallback the result is undefined rather
+   * than zero — the graph breaks and the audio falls silent there, which is
+   * honest about the function simply not being defined.
+   */
+  function parsePiecewise(openPos: number): CompiledFunction {
+    const branches: { when: CompiledFunction; then: CompiledFunction }[] = [];
+    let fallback: CompiledFunction | null = null;
+
+    if (atOp('}')) {
+      throw new ParseError('Empty {} — add at least one condition', openPos);
+    }
+
+    for (;;) {
+      const first = parseExpression();
+
+      if (eatOp(':')) {
+        branches.push({ when: first, then: parseExpression() });
+      } else {
+        // A bare value is the fallback, and nothing may follow it.
+        fallback = first;
+        if (atOp(',')) {
+          throw new ParseError(
+            'The fallback must be the last thing in {}',
+            peek().pos,
+          );
+        }
+      }
+
+      if (eatOp(',')) continue;
+      break;
+    }
+
+    if (!eatOp('}')) {
+      throw new ParseError('Missing closing "}"', peek().pos);
+    }
+
+    const otherwise = fallback;
+    return (x) => {
+      for (const branch of branches) {
+        if (branch.when(x) !== 0) return branch.then(x);
+      }
+      return otherwise ? otherwise(x) : NaN;
+    };
+  }
+
   function parseAtom(): CompiledFunction {
     const token = tokens[pos];
     pos += 1;
@@ -250,11 +409,29 @@ export function compile(source: string): CompiledFunction {
       if (atOp(')')) {
         throw new ParseError('Empty brackets — type something inside', token.pos);
       }
-      const inner = parseExpr();
+      const inner = parseExpression();
       if (!eatOp(')')) {
         throw new ParseError('Missing closing ")"', peek().pos);
       }
       return inner;
+    }
+
+    // ⌊x⌋ and ⌈x⌉, so an expression pasted from typeset maths works as written.
+    if (token.kind === 'op' && (token.text === '|_' || token.text === '|^')) {
+      const closing = token.text === '|_' ? '_|' : '^|';
+      const round = token.text === '|_' ? Math.floor : Math.ceil;
+      const inner = parseExpression();
+      if (!eatOp(closing)) {
+        throw new ParseError(
+          `Missing closing "${token.text === '|_' ? '⌋' : '⌉'}"`,
+          peek().pos,
+        );
+      }
+      return (x) => round(inner(x));
+    }
+
+    if (token.kind === 'op' && token.text === '{') {
+      return parsePiecewise(token.pos);
     }
 
     if (token.kind === 'name') {
@@ -264,8 +441,8 @@ export function compile(source: string): CompiledFunction {
         pos += 1; // consume '('
         const args: CompiledFunction[] = [];
         if (!atOp(')')) {
-          args.push(parseExpr());
-          while (eatOp(',')) args.push(parseExpr());
+          args.push(parseExpression());
+          while (eatOp(',')) args.push(parseExpression());
         }
         if (!eatOp(')')) {
           throw new ParseError(`Missing closing ")" for ${token.text}(`, peek().pos);
@@ -328,7 +505,7 @@ export function compile(source: string): CompiledFunction {
     throw new ParseError(`Unexpected "${token.text}"`, token.pos);
   }
 
-  const fn = parseExpr();
+  const fn = parseExpression();
 
   const trailing = peek();
   if (trailing.kind !== 'end') {
